@@ -1,10 +1,15 @@
 import PySimpleGUI as sg
 from datetime import datetime as dt
 import json
+import tkinter as tk
 from collections import deque
+from pathlib import Path
+from PIL import Image
+from PIL.ImageTk import PhotoImage
 
 TEXT_COLOR = "#eee3e3"
 BG_COLOR = "#202020"
+EMOTE_SIZE = (24, 24)
 
 with open("test.json", encoding="utf8") as file:
     data = file.readlines()
@@ -13,7 +18,6 @@ with open("test.json", encoding="utf8") as file:
         chat_data.append(json.loads(line))
 
 comments = {}
-
 for line in chat_data:#[2:150]:
     for action in line["replayChatItemAction"]["actions"]:
         try:
@@ -33,18 +37,18 @@ for line in chat_data:#[2:150]:
                 elif len(timestamp) == 7:
                     timestamp = f"0{timestamp}"
                 author = source["authorName"]["simpleText"]
-                message = ""
+                message = []
                 message_list = source["message"]["runs"]
                 for message_dict in message_list:
                     for message_type, message_segment in message_dict.items():
                         if message_type == "emoji":
                             try: # custom emote
-                                add_txt = message_segment["shortcuts"][1]
+                                emote_txt = message_segment["searchTerms"][1]
                             except IndexError:
-                                add_txt = message_segment["shortcuts"][0]
-                            message = f"{message}{add_txt} "
+                                emote_txt = message_segment["searchTerms"][0]
+                            message.append((message_type, emote_txt))
                         elif message_type == "text":
-                            message = f"{message}{message_segment} "
+                            message.append((message_type, message_segment))
                 if timestamp in comments.keys():
                     comments[timestamp].append((timestamp, author, message))
                 else:
@@ -54,14 +58,23 @@ for line in chat_data:#[2:150]:
         except KeyError:
             pass
 
-#print(comments)
+emote_list = list(Path("emotes").glob("*.png"))
+emote_names = [emote.name[:-4] for emote in emote_list]
 
 playing = False
 comment_deque =  deque("", maxlen=30)
 
+class Multiline(sg.Multiline):
+
+    def image_create(self, index, key, align=None, padx=None, pady=None):
+        if key in emote_images:
+            image = emote_images[key]
+            name = self.widget.image_create(index, align=align, image=image, padx=padx, pady=pady)
+            return name
+
 layout = [
     [sg.Text("Chat Replay")],
-    [sg.Multiline("", expand_x=True, expand_y=True, background_color=BG_COLOR, 
+    [Multiline("", expand_x=True, expand_y=True, background_color=BG_COLOR, 
                   text_color= TEXT_COLOR, autoscroll=True, write_only=True, disabled=True, key="-CHAT-")],
     [sg.Button("Play", key="-PLAY_PAUSE-"), sg.Push(), sg.Button("Exit")]
 ]
@@ -69,6 +82,11 @@ layout = [
 window = sg.Window("Youtube Live Chat Replay", layout, size=(480, 640), font=("Arial", 12), 
                    resizable=True, enable_close_attempted_event=True, finalize=True)
 #window.set_min_size((480, 640))
+
+chat_window = window["-CHAT-"]
+
+emote_images_pil = {filepath.name[:-4]: Image.open(str(filepath)).resize(EMOTE_SIZE) for filepath in emote_list}
+emote_images = {name: PhotoImage(image=image) for name, image in emote_images_pil.items()}
 
 def get_chat(comments, comment_deque, delta_t):
     try:
@@ -90,11 +108,33 @@ while True:
             delta_t = f"0{delta_t}"
         comment_deque = get_chat(comments, comment_deque, delta_t)
         if comment_deque:
-            window["-CHAT-"].update("")
+            chat_window.update("")
             for comment in comment_deque:
-                window["-CHAT-"].update(f"{comment[0]:<12} ", append=True, text_color_for_value="red", background_color_for_value=BG_COLOR)
-                window["-CHAT-"].update(f"{comment[1]}\n", append=True, text_color_for_value="green", background_color_for_value=BG_COLOR)
-                window["-CHAT-"].update(f"{comment[2]}\n\n", append=True, text_color_for_value=TEXT_COLOR, background_color_for_value=BG_COLOR)
+                chat_window.update(f"{comment[0]:<12} ", 
+                                   append=True, 
+                                   text_color_for_value="red", 
+                                   background_color_for_value=BG_COLOR)
+                chat_window.update(f"{comment[1]}\n", 
+                                   append=True, 
+                                   text_color_for_value="green", 
+                                   background_color_for_value=BG_COLOR)
+                for message_segment in comment[2]:
+                    if message_segment[0] == "text":
+                        chat_window.update(
+                            f"{message_segment[1] }", append=True, text_color_for_value=TEXT_COLOR, 
+                            background_color_for_value=BG_COLOR
+                        )
+                    elif message_segment[0] == "emoji":
+                        emote_img = message_segment[1]
+                        if emote_img in emote_names:
+                            display_emote = chat_window.image_create(tk.INSERT, emote_img, padx=2)
+                        else:
+                            chat_window.update(f":{message_segment[1]}: ", 
+                                               append=True, 
+                                               text_color_for_value=TEXT_COLOR, 
+                                               background_color_for_value=BG_COLOR)
+                chat_window.update("\n\n", append=True, 
+                                   text_color_for_value="red", background_color_for_value=BG_COLOR)
 
     match event:
         case sg.WIN_CLOSE_ATTEMPTED_EVENT | "Exit":

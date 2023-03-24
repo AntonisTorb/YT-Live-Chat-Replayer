@@ -2,3 +2,5 @@ env
 __pycache__
 .vscode
 *.json
+emotes
+*.png
