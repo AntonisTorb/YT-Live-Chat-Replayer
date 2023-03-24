@@ -1,17 +1,23 @@
-import PySimpleGUI as sg
+from collections import deque
 from datetime import datetime as dt
 import json
-import tkinter as tk
-from collections import deque
 from pathlib import Path
+import tkinter as tk
+
 from PIL import Image
 from PIL.ImageTk import PhotoImage
+import PySimpleGUI as sg
 
+FILENAME = "test.json"
+FONT_NAME = "Arial"
+FONT_SIZE = 12
 TEXT_COLOR = "#eee3e3"
+TIMESTAMP_COLOR = "red"
+USERNAME_COLOR = "orange"
 BG_COLOR = "#202020"
 EMOTE_SIZE = (24, 24)
 
-with open("test.json", encoding="utf8") as file:
+with open(FILENAME, encoding="utf8") as file:
     data = file.readlines()
     chat_data = []
     for line in data:
@@ -20,56 +26,60 @@ with open("test.json", encoding="utf8") as file:
 comments = {}
 for line in chat_data:#[2:150]:
     for action in line["replayChatItemAction"]["actions"]:
+        if "addLiveChatTickerItemAction" in action:
+            continue # membership stuff
+        item = action["addChatItemAction"]["item"]
         try:
-            item = action["addChatItemAction"]["item"]
-            try:
-                source = item["liveChatTextMessageRenderer"]
-            except KeyError:
-                pass
-            try:
-                timestamp = source["timestampText"]["simpleText"]
-                if timestamp.startswith("-"):
-                    timestamp = f"-00:0{timestamp[1:]}"
-                elif len(timestamp) == 4:
-                    timestamp = f"00:0{timestamp}"
-                elif len(timestamp) == 5:
-                    timestamp = f"00:{timestamp}"
-                elif len(timestamp) == 7:
-                    timestamp = f"0{timestamp}"
-                author = source["authorName"]["simpleText"]
-                message = []
-                message_list = source["message"]["runs"]
-                for message_dict in message_list:
-                    for message_type, message_segment in message_dict.items():
-                        if message_type == "emoji":
-                            try: # custom emote
-                                emote_txt = message_segment["searchTerms"][1]
-                            except IndexError:
-                                emote_txt = message_segment["searchTerms"][0]
-                            message.append((message_type, emote_txt))
-                        elif message_type == "text":
-                            message.append((message_type, message_segment))
-                if timestamp in comments.keys():
-                    comments[timestamp].append((timestamp, author, message))
-                else:
-                    comments[timestamp] = [(timestamp, author, message)]
-            except NameError:
-                pass
+            source = item["liveChatTextMessageRenderer"]
         except KeyError:
-            pass
+            continue # more membership stuff
+
+        timestamp = source["timestampText"]["simpleText"]
+        if timestamp.startswith("-"):
+            timestamp = f"-00:0{timestamp[1:]}"
+        elif len(timestamp) == 4:
+            timestamp = f"00:0{timestamp}"
+        elif len(timestamp) == 5:
+            timestamp = f"00:{timestamp}"
+        elif len(timestamp) == 7:
+            timestamp = f"0{timestamp}"
+        
+        author = source["authorName"]["simpleText"]
+        
+        message = []
+        message_list = source["message"]["runs"]
+        for message_dict in message_list:
+            for message_type, message_segment in message_dict.items():
+                if message_type == "emoji":
+                    try: # custom emote
+                        emote_txt = message_segment["searchTerms"][1]
+                    except IndexError:
+                        emote_txt = message_segment["searchTerms"][0]
+                    except KeyError:
+                        pass # see line 65275 in formattinghelp.json, annoying, no search term for handwave?!
+                    message.append((message_type, emote_txt))
+                elif message_type == "text":
+                    message.append((message_type, message_segment))
+        
+        if timestamp in comments.keys():
+            comments[timestamp].append((timestamp, author, message))
+        else:
+            comments[timestamp] = [(timestamp, author, message)]
 
 emote_list = list(Path("emotes").glob("*.png"))
 emote_names = [emote.name[:-4] for emote in emote_list]
 
 playing = False
-comment_deque =  deque("", maxlen=30)
+paused_timestamp = None
+comment_deque = deque("", maxlen=30)
 
 class Multiline(sg.Multiline):
+    '''Subclass so we can define the method necessary to display emotes in the Multiline element.'''
 
-    def image_create(self, index, key, align=None, padx=None, pady=None):
+    def image_create(self, index:str, key:str, padx:int=None, pady:int=None) -> str:
         if key in emote_images:
             image = emote_images[key]
-            name = self.widget.image_create(index, align=align, image=image, padx=padx, pady=pady)
+            name = self.widget.image_create(index, image=image, padx=padx, pady=pady)
             return name
 
 layout = [
@@ -79,7 +89,7 @@ layout = [
     [sg.Button("Play", key="-PLAY_PAUSE-"), sg.Push(), sg.Button("Exit")]
 ]
 
-window = sg.Window("Youtube Live Chat Replay", layout, size=(480, 640), font=("Arial", 12), 
+window = sg.Window("Youtube Live Chat Replay", layout, size=(480, 640), font=(FONT_NAME, FONT_SIZE), 
                    resizable=True, enable_close_attempted_event=True, finalize=True)
 #window.set_min_size((480, 640))
 
@@ -88,35 +98,40 @@ chat_window = window["-CHAT-"]
 emote_images_pil = {filepath.name[:-4]: Image.open(str(filepath)).resize(EMOTE_SIZE) for filepath in emote_list}
 emote_images = {name: PhotoImage(image=image) for name, image in emote_images_pil.items()}
 
-def get_chat(comments, comment_deque, delta_t):
-    try:
-        for comment in comments[delta_t]:
-            if comment not in comment_deque:
-                comment_deque.append(comment)
-        
-        #print(comment_deque)
-        return comment_deque
-    except KeyError:
-        return comment_deque
+def get_chat(comments:dict[str, tuple[str, str, list[tuple[str, str]]]], 
+             comment_deque:deque[tuple[str, str, list[tuple[str, str]]]], 
+             chat_timestamp:str) -> deque[tuple[str, str, list[tuple[str, str]]]]:
+    '''Returns a deque of comments that need to be displayed according to the current chat timestamp.'''
+
+    if chat_timestamp in comments.keys():
+        for comment in comments[chat_timestamp]:
+            if comment in comment_deque:
+                continue
+            comment_deque.append(comment)
+    return comment_deque
 
 while True:
     event, values = window.read(timeout=250)
     cur_time = dt.now()
     if playing:
-        delta_t = str(cur_time - start_time).split(".", 2)[0]
-        if len(delta_t) == 7:
-            delta_t = f"0{delta_t}"
-        comment_deque = get_chat(comments, comment_deque, delta_t)
+        if paused_timestamp is not None:
+            chat_timestamp_dt = cur_time - start_time + paused_timestamp
+        else:
+            chat_timestamp_dt = cur_time - start_time
+        chat_timestamp = str(chat_timestamp_dt).split(".", 2)[0]
+        if len(chat_timestamp) == 7:
+            chat_timestamp = f"0{chat_timestamp}"
+        comment_deque = get_chat(comments, comment_deque, chat_timestamp)
         if comment_deque:
             chat_window.update("")
             for comment in comment_deque:
                 chat_window.update(f"{comment[0]:<12} ", 
                                    append=True, 
-                                   text_color_for_value="red", 
+                                   text_color_for_value=TIMESTAMP_COLOR, 
                                    background_color_for_value=BG_COLOR)
                 chat_window.update(f"{comment[1]}\n", 
                                    append=True, 
-                                   text_color_for_value="green", 
+                                   text_color_for_value=USERNAME_COLOR, 
                                    background_color_for_value=BG_COLOR)
                 for message_segment in comment[2]:
                     if message_segment[0] == "text":
@@ -147,5 +162,5 @@ while True:
             elif playing:
                 playing = False
                 window["-PLAY_PAUSE-"].update("Resume")
-                # add pause logic and time tracking to resume
+                paused_timestamp = chat_timestamp_dt
 window.close()
