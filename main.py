@@ -18,6 +18,7 @@ TEXT_COLOR = "#eee3e3"
 TIMESTAMP_COLOR = "red"
 USERNAME_COLOR = "orange"
 BG_COLOR = "#202020"
+MEMBER_BG_COLOR = "blue"
 EMOTE_SIZE = (24, 24)
 PLAY_PAUSE_KEY = Key.space
 DISABLE_TITLEBAR = True # If True, then no window resizing after running the app.
@@ -41,6 +42,20 @@ def listen_kb():
         listener.join()
 
 
+def format_timestamp(timestamp:str) -> str:
+    '''Return a formatted string timestamp (HH:MM:SS).'''
+
+    if timestamp.startswith("-"):
+        timestamp = f"-00:0{timestamp[1:]}"
+    elif len(timestamp) == 4:
+        timestamp = f"00:0{timestamp}"
+    elif len(timestamp) == 5:
+        timestamp = f"00:{timestamp}"
+    elif len(timestamp) == 7:
+        timestamp = f"0{timestamp}"
+    return timestamp
+
+
 def get_comments() -> dict[str, list[tuple[str,str,tuple[str,str]]]]:
     '''Get a dictionary of all comments with the timestamp as key, and a list of tuples as value.
     The values contain the timestamp, author of the message and the message as a tuple.
@@ -54,30 +69,32 @@ def get_comments() -> dict[str, list[tuple[str,str,tuple[str,str]]]]:
             chat_data.append(json.loads(line))
 
     comments = {}
-    for line in chat_data:#[2:150]:
+    for line in chat_data[0:1000]:
         for action in line["replayChatItemAction"]["actions"]:
             if "addLiveChatTickerItemAction" in action:
                 continue # membership stuff
             item = action["addChatItemAction"]["item"]
-            try:
-                source = item["liveChatTextMessageRenderer"]
-            except KeyError:
-                continue # more membership stuff
 
-            timestamp = source["timestampText"]["simpleText"]
-            if timestamp.startswith("-"):
-                timestamp = f"-00:0{timestamp[1:]}"
-            elif len(timestamp) == 4:
-                timestamp = f"00:0{timestamp}"
-            elif len(timestamp) == 5:
-                timestamp = f"00:{timestamp}"
-            elif len(timestamp) == 7:
-                timestamp = f"0{timestamp}"
+            if "liveChatTextMessageRenderer" in item:
+                source = item["liveChatTextMessageRenderer"]
+                message_list = source["message"]["runs"]
+            elif "liveChatMembershipItemRenderer" in item:
+                source = item["liveChatMembershipItemRenderer"]
+                if "headerPrimaryText" in source:
+                    message_list = source["headerPrimaryText"]["runs"]
+                    if "message" in source:
+                        message_list_2 = source["message"]["runs"]
+                else:
+                    message_list = source["headerSubtext"]["runs"]
+            else:
+                continue
+            
+            timestamp = format_timestamp(source["timestampText"]["simpleText"])
             
             author = source["authorName"]["simpleText"]
             
             message = []
-            message_list = source["message"]["runs"]
+            
             for message_dict in message_list:
                 for message_type, message_segment in message_dict.items():
                     if message_type == "emoji":
@@ -88,8 +105,25 @@ def get_comments() -> dict[str, list[tuple[str,str,tuple[str,str]]]]:
                         except KeyError:
                             pass # see line 65275 in formattinghelp.json, annoying, no search term for handwave?!
                         message.append((message_type, emote_txt))
+                    elif "liveChatMembershipItemRenderer" in item and message_type == "text":
+                        message.append(("membership", message_segment))
                     elif message_type == "text":
                         message.append((message_type, message_segment))
+            try: # For membership messages.
+                for message_dict in message_list_2:
+                    for message_type, message_segment in message_dict.items():
+                        if message_type == "emoji":
+                            try: # custom emote
+                                emote_txt = message_segment["searchTerms"][1]
+                            except IndexError:
+                                emote_txt = message_segment["searchTerms"][0]
+                            except KeyError:
+                                pass # see line 65275 in formattinghelp.json, annoying, no search term for handwave?!
+                            message.append((message_type, emote_txt))
+                        elif message_type == "text":
+                            message.append((message_type, message_segment))
+            except UnboundLocalError:
+                pass
             
             if timestamp in comments.keys():
                 comments[timestamp].append((timestamp, author, message))
@@ -177,19 +211,20 @@ def main_window() -> None:
             if comment_deque:
                 chat_window.update("")
                 for comment in comment_deque:
+                    bg_color = MEMBER_BG_COLOR if "membership" in comment[2][0] else BG_COLOR
                     chat_window.update(f"{comment[0]:<12} ", 
                                     append=True, 
                                     text_color_for_value=TIMESTAMP_COLOR, 
-                                    background_color_for_value=BG_COLOR)
+                                    background_color_for_value=bg_color)
                     chat_window.update(f"{comment[1]}\n", 
                                     append=True, 
                                     text_color_for_value=USERNAME_COLOR, 
-                                    background_color_for_value=BG_COLOR)
+                                    background_color_for_value=bg_color)
                     for message_type, message_content in comment[2]:
                         if message_type == "text":
                             chat_window.update(
                                 f"{message_content} ", append=True, text_color_for_value=TEXT_COLOR, 
-                                background_color_for_value=BG_COLOR
+                                background_color_for_value=bg_color
                             )
                         elif message_type == "emoji":
                             emote_img = message_content
@@ -199,9 +234,14 @@ def main_window() -> None:
                                 chat_window.update(f":{message_content}: ", 
                                                 append=True, 
                                                 text_color_for_value=TEXT_COLOR, 
-                                                background_color_for_value=BG_COLOR)
+                                                background_color_for_value=bg_color)
+                        elif message_type == "membership":
+                            chat_window.update(
+                                f"{message_content} ", append=True, text_color_for_value=TEXT_COLOR, 
+                                background_color_for_value=bg_color
+                            )
                     chat_window.update("\n\n", append=True, 
-                                    text_color_for_value="red", background_color_for_value=BG_COLOR)
+                                    text_color_for_value="red", background_color_for_value=bg_color)
 
         match event:
             case sg.WIN_CLOSE_ATTEMPTED_EVENT | "Exit":
