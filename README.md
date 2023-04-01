@@ -15,4 +15,5 @@ A GUI app that can replay the live chat from a YouTube live stream, using the JS
 - Membership notifications/messages too maybe?
     - (idea: use `message_type` to specify if superchat or membership and add different background.)
 - File selector to specify the JSON file path.
+- Option to have a different background/text color for comments from specific usernames (for example the streamer or a live translator).
 - Properly refactor code for easier modification and performance (less loops would be nice, but the yt JSON is a bit messy).
