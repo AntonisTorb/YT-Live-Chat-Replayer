@@ -51,13 +51,14 @@ FONT_NAME = "Arial"
 FONT_SIZE = 12
 STYLE = "bold" # For no style use empty string: ""
 TEXT_COLOR = "#eee3e3"
+USER_MESSAGE_COLOR = "red"
 TIMESTAMP_COLOR = "red"
 USERNAME_COLOR = "orange"
 BG_COLOR = "#202020"
 MEMBER_BG_COLOR = "blue"
 SUPERCHAT_BG_COLOR = "green"
 EMOTE_SIZE = (24, 24)
-CHAT_LENGTH = 30 # Reducing this increadses perfiormance.
+CHAT_LENGTH = 30 # Reducing this increases performance.
 PLAY_PAUSE_KEY = Key.space
 DISABLE_TITLEBAR = True # If True, then no window resizing after running the app.
 WINDOW_SIZE = (480, 640) # If 'DISABLE_TITLEBAR' is True, set the window size (width, height)
@@ -118,7 +119,7 @@ def get_comments(filepath:str|Path, emote_link_dict:dict[str,str]) -> dict[str, 
             chat_data.append(json.loads(line))
 
     comments = {}
-    for line in chat_data:#[1780:1810]:
+    for line in chat_data:#[0:1]:
         for action in line["replayChatItemAction"]["actions"]:
             if "addLiveChatTickerItemAction" in action:
                 continue
@@ -263,7 +264,17 @@ def main_window() -> None:
         [sg.Text("Chat Replay")],
         [Multiline("", expand_x=True, expand_y=True, background_color=BG_COLOR, 
                     text_color= TEXT_COLOR, autoscroll=True, write_only=True, disabled=True, key="-CHAT-")],
-        [sg.Button("Play", key="-PLAY_PAUSE-"), sg.Push(), sg.Button("Exit")]
+        [
+            sg.Button("Play", key="-PLAY_PAUSE-"), sg.Push(background_color=BG_COLOR), 
+            sg.Spin([i for i in range(24)], initial_value=0, size=(2,1), 
+                    background_color=BG_COLOR, text_color=TEXT_COLOR, key="-HR-"), 
+            sg.Spin([i for i in range(60)], initial_value=0, size=(2,1), 
+                    background_color=BG_COLOR, text_color=TEXT_COLOR, key="-MIN-"), 
+            sg.Spin([i for i in range(60)], initial_value=0, size=(2,1), 
+                    background_color=BG_COLOR, text_color=TEXT_COLOR, key="-SEC-"), 
+            sg.Button("Go"),
+            sg.Push(background_color=BG_COLOR), sg.Button("Exit")
+        ]
     ]
 
     transparent_color = BG_COLOR if TRANSPARENT else None
@@ -279,7 +290,7 @@ def main_window() -> None:
     
     chat_window.update("Getting emotes from web, please wait...\n", 
                                     append=True, 
-                                    text_color_for_value=TIMESTAMP_COLOR, 
+                                    text_color_for_value=USER_MESSAGE_COLOR, 
                                     background_color_for_value=BG_COLOR)
     window.refresh()
 
@@ -287,7 +298,7 @@ def main_window() -> None:
     
     chat_window.update("Ready to play!\n", 
                                     append=True, 
-                                    text_color_for_value=TIMESTAMP_COLOR, 
+                                    text_color_for_value=USER_MESSAGE_COLOR, 
                                     background_color_for_value=BG_COLOR)
     
     while True:
@@ -312,6 +323,10 @@ def main_window() -> None:
             chat_timestamp = str(chat_timestamp_dt).split(".", 2)[0]
             if len(chat_timestamp) == 7:
                 chat_timestamp = f"0{chat_timestamp}"
+            hr, min, sec = tuple(chat_timestamp.split(":"))
+            window["-HR-"].update(hr)
+            window["-MIN-"].update(min)
+            window["-SEC-"].update(sec)
             comment_deque = get_chat(comments, comment_deque, chat_timestamp)
             if comment_deque:
                 chat_window.update("")
@@ -369,6 +384,22 @@ def main_window() -> None:
                     playing = False
                     window["-PLAY_PAUSE-"].update("Resume")
                     paused_timestamp = chat_timestamp_dt
+            case "Go":
+                if playing:
+                    playing = False
+                try:
+                    hr = int(values["-HR-"])
+                    min = int(values["-MIN-"])
+                    sec = int(values["-SEC-"])
+                
+                    if hr in range(24) and min in range(60) and sec in range(60):
+                        paused_timestamp = timedelta(hours=int(hr), minutes=int(min),seconds=int(sec))
+                    else:
+                        chat_window.update("Please enter a correct time format.\n", append=True, 
+                                    text_color_for_value=USER_MESSAGE_COLOR, background_color_for_value=BG_COLOR)
+                except ValueError:
+                    chat_window.update("Please enter a correct time format.\n", append=True, 
+                                    text_color_for_value=USER_MESSAGE_COLOR, background_color_for_value=BG_COLOR)
     window.close()
 
 def main():
