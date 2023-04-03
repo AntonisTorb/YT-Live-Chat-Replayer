@@ -1,0 +1,26 @@
+{
+    "FONT_NAME": "Arial",
+    "FONT_SIZE": 12,
+    "STYLE": "bold",
+    "TEXT_COLOR": "#eee3e3",
+    "NOTIFICATION_COLOR": "red",
+    "TIMESTAMP_COLOR": "red",
+    "USERNAME_COLOR": "orange",
+    "BG_COLOR": "#202020",
+    "MEMBER_BG_COLOR": "blue",
+    "SUPERCHAT_BG_COLOR": "green",
+    "HIGHLIGHT_USER_BG_COLOR": "grey",
+    "EMOTE_SIZE": [
+        24,
+        24
+    ],
+    "CHAT_LENGTH": 30,
+    "PLAY_PAUSE_KEY": "space",
+    "DISABLE_TITLEBAR": true,
+    "WINDOW_SIZE": [
+        480,
+        640
+    ],
+    "TRANSPARENT": false,
+    "ALPHA": 0.7
+}

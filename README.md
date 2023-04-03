@@ -10,10 +10,10 @@ A GUI app that can replay the live chat from a YouTube live stream, using the JS
 - ~~Add `start`/`pause` button and proper time tracking.~~ Done.
 - ~~Update the Multiline element with the most recent comments up to a limit (maybe use a `collections.deque` to keep it limited to avoid `if-else` statements for length?)~~ Done!
 - ~~Add option to jump to timestamp, rewind or go forward maybe?~~ Done, no rewind/forward.
-- ~~Figure out if possible to display images in the Multiline so I can add emotes.~~ Done, need to add option to get emotes from local file after adding the file selector.
+- ~~Figure out if possible to display images in the Multiline so I can add emotes.~~ Done!
 - ~~Add display of superchat comments (`liveChatPaidMessageRenderer` instead of `liveChatTextMessageRenderer`).~~ Done!
 - ~~Membership notifications/messages too maybe?~~ Done!
-- File selector to specify the JSON file path, emote file path (optional) and file containing usernames to highlight (see next).
-- Option to have a different background/text color for comments from specific usernames (for example the streamer or a live translator).
+- ~~File selector to specify the JSON file path, emote file path (optional) and file containing usernames to highlight (see next).~~ Done!
+- ~~Option to have a different background/text color for comments from specific usernames (for example the streamer or a live translator).~~ Done!
 - When starting the app, after selecting the filepaths and before playback, display all the chats with a negative timestamp.
 - Properly refactor code for easier modification and performance (less loops would be nice, but the yt JSON is a bit messy).

@@ -4,3 +4,5 @@ __pycache__
 *.json
 emotes
 *.png
+*.txt
+!settings.json
