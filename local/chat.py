@@ -48,7 +48,7 @@ def determine_message_segment(emote_link_dict:dict[str,str],
     for message_dict in message_list:
         for message_type, message_segment in message_dict.items():
             if message_type == "emoji":
-                if len(message_segment["emojiId"]) <= 2:
+                if len(message_segment["emojiId"]) <= 4:
                     emote_txt = message_segment["emojiId"]
                     populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
                 else:
@@ -58,6 +58,9 @@ def determine_message_segment(emote_link_dict:dict[str,str],
                     except IndexError:
                         emote_txt = message_segment["searchTerms"][0]
                         populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
+                    except KeyError:  # Just in case
+                        # print(len(message_segment["emojiId"]))
+                        continue
                 message.append((message_type, emote_txt))
             elif "liveChatMembershipItemRenderer" in item and message_type == "text":
                 message.append(("membership", message_segment))
