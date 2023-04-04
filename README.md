@@ -23,9 +23,7 @@ The app supports playback of the chat messages, including emotes. Membership not
 Instructions for Windows:
 - Make sure you have Python installed on your system.
 - Open a Terminal/Powershell/Command Line window in the directory of the `main.py` file. On windows, you can navigate to this directory by executiong the command `cd 'the directory path here'`
-- Execute the command 
-        pip install -r requirements.txt
-to install all the required packages. This might take some time.
+- Execute the command `pip install -r requirements.txt` to install all the required packages. This might take some time.
 - Execute the command `python main.py` to start the app.
 
 ## How to use
