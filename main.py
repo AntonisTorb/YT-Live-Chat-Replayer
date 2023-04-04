@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import threading
 import tkinter as tk
+from typing import Any
 
 import local
 
@@ -81,9 +82,12 @@ def format_timestamp(timestamp:str) -> str:
     return timestamp
 
 
-def populate_emote_links(emote_txt:str, emote_link_dict:dict[str,str], local_emote_names:list[str], url:str) -> None:
-    '''Populates a dictionary with the emote name as key and emote link as value for every unique emote.
-    Svg images not supported by Pillow, so we will be using the emoji instead.
+def populate_emote_links(emote_txt:str, 
+                         emote_link_dict:dict[str,str], 
+                         local_emote_names:list[str], 
+                         url:str) -> None:
+    '''Populates a dictionary with the emote name as key and emote link as value for every 
+    unique emote. Svg images not supported by Pillow, so we will be using the emoji instead.
     '''
 
     if emote_txt in emote_link_dict.keys() or url.endswith("svg") or emote_txt in local_emote_names:
@@ -91,7 +95,38 @@ def populate_emote_links(emote_txt:str, emote_link_dict:dict[str,str], local_emo
     emote_link_dict[emote_txt] = url
 
 
-def get_comments(filepath:str|Path, emote_link_dict:dict[str,str], emote_names:list[str] = []) -> dict[str, list[tuple[str,str,tuple[str,str]]]]:
+def determine_message_segment(emote_link_dict:dict[str,str], 
+                              emote_names:list[str], 
+                              message:list[tuple[str,str]], 
+                              message_list:list[dict[str,Any]], 
+                              item:dict[str,Any]={}) -> None:
+    '''Determining the type of the message segment and appending the content to the message.
+    For emotes, the names and links are saved, unless they exist in local file (if selected).
+    '''
+
+    for message_dict in message_list:
+        for message_type, message_segment in message_dict.items():
+            if message_type == "emoji":
+                if len(message_segment["emojiId"]) <= 2:
+                    emote_txt = message_segment["emojiId"]
+                    populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
+                else:
+                    try:  # custom emote
+                        emote_txt = message_segment["searchTerms"][1]
+                        populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
+                    except IndexError:
+                        emote_txt = message_segment["searchTerms"][0]
+                        populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
+                message.append((message_type, emote_txt))
+            elif "liveChatMembershipItemRenderer" in item and message_type == "text":
+                message.append(("membership", message_segment))
+            elif message_type == "text":
+                message.append((message_type, message_segment))
+
+
+def get_comments(filepath:str|Path, 
+                 emote_link_dict:dict[str,str], 
+                 emote_names:list[str] = []) -> dict[str, list[tuple[str,str,tuple[str,str]]]]:
     '''Get a dictionary of all comments with the timestamp as key, and a list of tuples as value.
     The values contain the timestamp, author of the message and the message as a tuple.
     The message tuple contains the message type (text, emoji, etc.) and the message content.
@@ -104,88 +139,56 @@ def get_comments(filepath:str|Path, emote_link_dict:dict[str,str], emote_names:l
             chat_data.append(json.loads(line))
 
     comments = {}
-    for line in chat_data:#[0:1]:
-        for action in line["replayChatItemAction"]["actions"]:
-            if "addLiveChatTickerItemAction" in action:
-                continue
-            item = action["addChatItemAction"]["item"]
-            amount = None
-            if "liveChatTextMessageRenderer" in item:  # Normal chat.
-                source = item["liveChatTextMessageRenderer"]
+    member_message_list = []
+
+    for line in chat_data:#[0:100]:
+        action = line["replayChatItemAction"]["actions"][0]
+
+        if "addLiveChatTickerItemAction" in action:
+            continue
+        item = action["addChatItemAction"]["item"]
+        amount = None
+        if "liveChatTextMessageRenderer" in item:  # Normal chat.
+            source = item["liveChatTextMessageRenderer"]
+            message_list = source["message"]["runs"]
+            timestamp = format_timestamp(source["timestampText"]["simpleText"])
+            author = source["authorName"]["simpleText"]
+        elif "liveChatMembershipItemRenderer" in item:  # Member.
+            source = item["liveChatMembershipItemRenderer"]
+            if "headerPrimaryText" in source:
+                message_list = source["headerPrimaryText"]["runs"]
+                if "message" in source:
+                    member_message_list = source["message"]["runs"]
+            else:
+                message_list = source["headerSubtext"]["runs"]
+            timestamp = format_timestamp(source["timestampText"]["simpleText"])
+            author = source["authorName"]["simpleText"]
+        elif "liveChatPaidMessageRenderer" in item:  # Superchat.
+            source = item["liveChatPaidMessageRenderer"]
+            amount = source["purchaseAmountText"]["simpleText"]
+            timestamp = format_timestamp(source["timestampText"]["simpleText"])
+            author = source["authorName"]["simpleText"]
+            try:
                 message_list = source["message"]["runs"]
-                timestamp = format_timestamp(source["timestampText"]["simpleText"])
-                author = source["authorName"]["simpleText"]
-            elif "liveChatMembershipItemRenderer" in item:  # Member.
-                source = item["liveChatMembershipItemRenderer"]
-                if "headerPrimaryText" in source:
-                    message_list = source["headerPrimaryText"]["runs"]
-                    if "message" in source:
-                        member_message_list = source["message"]["runs"]
-                else:
-                    message_list = source["headerSubtext"]["runs"]
-                timestamp = format_timestamp(source["timestampText"]["simpleText"])
-                author = source["authorName"]["simpleText"]
-            elif "liveChatPaidMessageRenderer" in item:  # Superchat.
-                source = item["liveChatPaidMessageRenderer"]
-                amount = source["purchaseAmountText"]["simpleText"]
-                timestamp = format_timestamp(source["timestampText"]["simpleText"])
-                author = source["authorName"]["simpleText"]
-                try:
-                    message_list = source["message"]["runs"]
-                except KeyError:
-                    message_list = []
-            else:
-                continue
+            except KeyError:
+                message_list = []
+        else:
+            continue
 
-            if amount:
-                message = [("superchat", amount)]
-            else:
-                message = []
+        if amount:
+            message = [("superchat", amount)]
+        else:
+            message = []
 
-            # !!! need to refactor this, too much indented and duplicate code
-            for message_dict in message_list:
-                for message_type, message_segment in message_dict.items():
-                    if message_type == "emoji":
-                        if len(message_segment["emojiId"]) <= 2:
-                            emote_txt = message_segment["emojiId"]
-                            populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
-                        else:
-                            try:  # custom emote
-                                emote_txt = message_segment["searchTerms"][1]
-                                populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
-                            except IndexError:
-                                emote_txt = message_segment["searchTerms"][0]
-                                populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
-                        message.append((message_type, emote_txt))
-                    elif "liveChatMembershipItemRenderer" in item and message_type == "text":
-                        message.append(("membership", message_segment))
-                    elif message_type == "text":
-                        message.append((message_type, message_segment))
-            try:  # For membership messages.
-                for message_dict in member_message_list:
-                    for message_type, message_segment in message_dict.items():
-                        if message_type == "emoji":
-                            if len(message_segment["emojiId"]) <= 2:
-                                emote_txt = message_segment["emojiId"]
-                                populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
-                            else:
-                                try:  # custom emote
-                                    emote_txt = message_segment["searchTerms"][1]
-                                    populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
-                                except IndexError:
-                                    emote_txt = message_segment["searchTerms"][0]
-                                    populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
-                            message.append((message_type, emote_txt))
-                        elif message_type == "text":
-                            message.append((message_type, message_segment))
-                member_message_list = []
-            except UnboundLocalError:
-                pass
-            
-            if timestamp in comments.keys():
-                comments[timestamp].append((timestamp, author, message))
-            else:
-                comments[timestamp] = [(timestamp, author, message)]
+        determine_message_segment(emote_link_dict, emote_names, message, message_list, item)
+        if member_message_list:
+            determine_message_segment(emote_link_dict, emote_names, message, member_message_list)
+            member_message_list = []
+        
+        if timestamp in comments.keys():
+            comments[timestamp].append((timestamp, author, message))
+        else:
+            comments[timestamp] = [(timestamp, author, message)]
 
     return comments
 
@@ -203,7 +206,9 @@ def get_chat(comments:dict[str, list[tuple[str,str,tuple[str,str]]]],
     return comment_deque
 
 
-def prepare_emotes(emote_link_dict:dict[str,str], emote_size:tuple[int,int], local_emote_list:list[Path]=[]) -> dict[str,PhotoImage]:
+def prepare_emotes(emote_link_dict:dict[str,str], 
+                   emote_size:tuple[int,int], 
+                   local_emote_list:list[Path]=[]) -> dict[str,PhotoImage]:
     '''Produces a dictionary with the emote name as key and a PhotoImage object containing 
     the emote image so it can be displayed in the chat window.
     '''
@@ -226,8 +231,8 @@ def prepare_emotes(emote_link_dict:dict[str,str], emote_size:tuple[int,int], loc
 
 def load_settings() -> dict[str, str|int|tuple[int,int]|bool]:
     '''Returns a dictionary containing the required settings for the application.
-    If a "settings.json" file exists in the main directory, then the setting are loaded from there,
-    else the settings file is created with the default settings.
+    If a "settings.json" file exists in the main directory, then the setting are loaded 
+    from there, else the settings file is created with the default settings.
     '''
 
     settings = { 
@@ -264,9 +269,9 @@ def load_settings() -> dict[str, str|int|tuple[int,int]|bool]:
 
 
 def data_selection_window(settings:dict[str, str|int|tuple[int,int]|bool]) -> dict[str, bool|Path|None]:
-    '''Creates a window where the user can enter the paths to the required chat json file, as well as optionally
-    select a local emote directory and a text containing usernames to highlight in chat. The selections are returned
-    in the "data" dictionary.
+    '''Creates a window where the user can enter the paths to the required chat json file,
+    as well as optionally select a local emote directory and a text containing usernames 
+    to highlight in chat. The selections are returned in the "data" dictionary.
     '''
 
     data = {
@@ -281,19 +286,19 @@ def data_selection_window(settings:dict[str, str|int|tuple[int,int]|bool]) -> di
     layout = [
         [
             sg.Text("Select the JSON file:", background_color=settings["BG_COLOR"]), 
-            sg.Input("", readonly=True, key="-JSON_PATH-"), 
+            sg.Input("", readonly=True, key="-JSON_PATH-", expand_x=True), 
             sg.Button("Browse", key="-BROWSE_JSON-")
         ],
         [
             sg.Checkbox("Use local emote images from directory:", key="-USE_LOCAL_EMOTES-", 
                         enable_events=True, background_color=settings["BG_COLOR"]),
-            sg.Input("", readonly=True, key="-EMOTE_PATH-"), 
+            sg.Input("", readonly=True, key="-EMOTE_PATH-", expand_x=True), 
             sg.Button("Browse", key="-BROWSE_EMOTE-")
         ],
         [
             sg.Checkbox("Highlight users in file:", key="-HIGHLIGHT_USERS-", 
                         enable_events=True, background_color=settings["BG_COLOR"]), 
-            sg.Input("", readonly=True, key="-USER_PATH-"), 
+            sg.Input("", readonly=True, key="-USER_PATH-", expand_x=True), 
             sg.Button("Browse", key="-BROWSE_USER_HIGHLIGHT-")
         ],
         [sg.Button("Start"), sg.Push(background_color=settings["BG_COLOR"]), sg.Button("Exit")]
@@ -301,7 +306,7 @@ def data_selection_window(settings:dict[str, str|int|tuple[int,int]|bool]) -> di
 
     data_window = sg.Window("Data selection",layout, enable_close_attempted_event=True,
                             font=(settings["FONT_NAME"], settings["FONT_SIZE"], settings["STYLE"]), 
-                            resizable=True, background_color=settings["BG_COLOR"], finalize=True)
+                            resizable=False, background_color=settings["BG_COLOR"], finalize=True)
     
     while True:
         event, values = data_window.read()
@@ -342,6 +347,62 @@ def data_selection_window(settings:dict[str, str|int|tuple[int,int]|bool]) -> di
     return data
 
 
+def display_chat(chat_window:sg.Multiline, 
+                 comment_deque:deque[tuple[str, str, tuple[str, str]]]|list[tuple[str, str, tuple[str, str]]], 
+                 emote_images:dict[str,PhotoImage], 
+                 settings:dict[str, str|int|tuple[int,int]|bool], 
+                 usernames_to_highlight:list[str]) -> None:
+    '''Displays the chat based on the current timestamp to the chat window.
+    Also displays the negative timestamp chat items at startup.
+    '''
+    
+    if comment_deque:
+        chat_window.update("")
+        for comment in comment_deque:
+            if "membership" not in comment[2][0] and "superchat" not in comment[2][0]:
+                bg_color = settings["BG_COLOR"]
+            elif "membership" in comment[2][0]:
+                bg_color = settings["MEMBER_BG_COLOR"]
+            elif "superchat" in comment[2][0]:
+                bg_color = settings["SUPERCHAT_BG_COLOR"]
+            if usernames_to_highlight:
+                if comment[1] in usernames_to_highlight:
+                    bg_color = settings["HIGHLIGHT_USER_BG_COLOR"]
+
+            chat_window.update(f"{comment[0]:<12} ", append=True, 
+                            text_color_for_value=settings["TIMESTAMP_COLOR"], 
+                            background_color_for_value=bg_color)
+            chat_window.update(f"{comment[1]}\n", append=True, 
+                            text_color_for_value=settings["USERNAME_COLOR"], 
+                            background_color_for_value=bg_color)
+            for message_type, message_content in comment[2]:
+                if message_type == "text":
+                    chat_window.update(f"{message_content} ", append=True, 
+                                        text_color_for_value=settings["TEXT_COLOR"], 
+                                        background_color_for_value=bg_color)
+                elif message_type == "emoji":
+                    emote_img = message_content
+                    if emote_img in emote_images.keys():
+                        # No parameter for background color in tk.Text.image_create...
+                        # chat_window.widget.configure(bg=bg_color) # Nope, worse...
+                        _ = chat_window.image_create(tk.INSERT, emote_img, padx=2)
+                    else:
+                        chat_window.update(f"{message_content} ", append=True, 
+                                        text_color_for_value=settings["TEXT_COLOR"], 
+                                        background_color_for_value=bg_color)
+                elif message_type == "membership" or message_type == "superchat":
+                    chat_window.update(f"{message_content} ", append=True, 
+                                        text_color_for_value=settings["TEXT_COLOR"], 
+                                        background_color_for_value=bg_color)
+                
+            chat_window.update("\n", append=True, 
+                            text_color_for_value=settings["TEXT_COLOR"], 
+                            background_color_for_value=bg_color)
+            chat_window.update("\n", append=True, 
+                            text_color_for_value=settings["TEXT_COLOR"], 
+                            background_color_for_value=settings["BG_COLOR"])
+
+
 def main_window() -> None:
     '''Main window construction and logic loop.'''
     
@@ -361,7 +422,7 @@ def main_window() -> None:
         comments = get_comments(data["json path"], emote_link_dict, local_emote_names)
     else: 
         comments = get_comments(data["json path"], emote_link_dict)
-    
+
     if data["highlight users"]:
         with open(data["user path"], "r") as file:
             usernames_to_highlight = [user[:-1] if user.endswith("\n") else user for user in file.readlines()]
@@ -384,7 +445,8 @@ def main_window() -> None:
         [Multiline("", expand_x=True, expand_y=True, background_color=settings["BG_COLOR"], 
                     text_color= settings["TEXT_COLOR"], autoscroll=True, write_only=True, disabled=True, key="-CHAT-")],
         [
-            sg.Button("Play", key="-PLAY_PAUSE-"), sg.Push(background_color=settings["BG_COLOR"]), 
+            sg.Button("⏵", key="-PLAY_PAUSE-"), sg.Button("⏹", key="-STOP-"), 
+            sg.Push(background_color=settings["BG_COLOR"]),
             sg.Spin([i for i in range(24)], initial_value=0, size=(2,1), 
                     background_color=settings["BG_COLOR"], text_color=settings["TEXT_COLOR"], key="-HR-"), 
             sg.Spin([i for i in range(60)], initial_value=0, size=(2,1), 
@@ -418,11 +480,19 @@ def main_window() -> None:
         emote_images = prepare_emotes(emote_link_dict, settings["EMOTE_SIZE"], local_emote_list)
     else:
         emote_images = prepare_emotes(emote_link_dict, settings["EMOTE_SIZE"])
-    
-    chat_window.update("Ready to play!\n", append=True, 
-                                    text_color_for_value=settings["NOTIFICATION_COLOR"], 
-                                    background_color_for_value=settings["BG_COLOR"])
-    
+
+    temp_list = []
+    for timestamp, comment_list in comments.items():
+        if not timestamp.startswith("-"):
+            break
+        for comment in comment_list:
+            if comment in temp_list:
+                continue
+            temp_list.append(comment)
+        if temp_list:
+            display_chat(chat_window, temp_list, emote_images, settings, usernames_to_highlight)
+    del(temp_list)
+
     while True:
 
         global key_event
@@ -436,65 +506,24 @@ def main_window() -> None:
         # if event != "__TIMEOUT__":
         #     print(event)
         
-        cur_time = dt.now()
         if playing:
+            cur_time = dt.now()
             if paused_timestamp is not None:
                 chat_timestamp_dt = cur_time - start_time + paused_timestamp
             else:
                 chat_timestamp_dt = cur_time - start_time
+            
             chat_timestamp = str(chat_timestamp_dt).split(".", 2)[0]
             if len(chat_timestamp) == 7:
                 chat_timestamp = f"0{chat_timestamp}"
+            
             hr, min, sec = tuple(chat_timestamp.split(":"))
             window["-HR-"].update(hr)
             window["-MIN-"].update(min)
             window["-SEC-"].update(sec)
-            comment_deque = get_chat(comments, comment_deque, chat_timestamp)
-            if comment_deque:
-                chat_window.update("")
-                for comment in comment_deque:
-                    if "membership" not in comment[2][0] and "superchat" not in comment[2][0]:
-                        bg_color = settings["BG_COLOR"]
-                    elif "membership" in comment[2][0]:
-                        bg_color = settings["MEMBER_BG_COLOR"]
-                    elif "superchat" in comment[2][0]:
-                        bg_color = settings["SUPERCHAT_BG_COLOR"]
-                    if usernames_to_highlight:
-                        if comment[1] in usernames_to_highlight:
-                            bg_color = settings["HIGHLIGHT_USER_BG_COLOR"]
 
-                    chat_window.update(f"{comment[0]:<12} ", append=True, 
-                                    text_color_for_value=settings["TIMESTAMP_COLOR"], 
-                                    background_color_for_value=bg_color)
-                    chat_window.update(f"{comment[1]}\n", append=True, 
-                                    text_color_for_value=settings["USERNAME_COLOR"], 
-                                    background_color_for_value=bg_color)
-                    for message_type, message_content in comment[2]:
-                        if message_type == "text":
-                            chat_window.update(f"{message_content} ", append=True, 
-                                               text_color_for_value=settings["TEXT_COLOR"], 
-                                               background_color_for_value=bg_color)
-                        elif message_type == "emoji":
-                            emote_img = message_content
-                            if emote_img in emote_images.keys():
-                                # No parameter for background color in tk.Text.image_create...
-                                # chat_window.widget.configure(bg=bg_color) # Nope, worse...
-                                _ = chat_window.image_create(tk.INSERT, emote_img, padx=2)
-                            else:
-                                chat_window.update(f"{message_content} ", append=True, 
-                                                text_color_for_value=settings["TEXT_COLOR"], 
-                                                background_color_for_value=bg_color)
-                        elif message_type == "membership" or message_type == "superchat":
-                            chat_window.update(f"{message_content} ", append=True, 
-                                               text_color_for_value=settings["TEXT_COLOR"], 
-                                               background_color_for_value=bg_color)
-                        
-                    chat_window.update("\n", append=True, 
-                                    text_color_for_value=settings["TEXT_COLOR"], 
-                                    background_color_for_value=bg_color)
-                    chat_window.update("\n", append=True, 
-                                    text_color_for_value=settings["TEXT_COLOR"], 
-                                    background_color_for_value=settings["BG_COLOR"])
+            comment_deque = get_chat(comments, comment_deque, chat_timestamp)
+            display_chat(chat_window, comment_deque, emote_images, settings, usernames_to_highlight)
                 
         match event:
             case sg.WIN_CLOSE_ATTEMPTED_EVENT | "Exit":
@@ -502,15 +531,27 @@ def main_window() -> None:
             case "-PLAY_PAUSE-":
                 if not playing:
                     playing = True
-                    window["-PLAY_PAUSE-"].update("Pause")
+                    window["-PLAY_PAUSE-"].update("⏸")
                     start_time = dt.now()
                 elif playing:
                     playing = False
-                    window["-PLAY_PAUSE-"].update("Resume")
+                    window["-PLAY_PAUSE-"].update("⏵")
                     paused_timestamp = chat_timestamp_dt
+            case "-STOP-":
+                playing = False
+                paused_timestamp = None
+                comment_deque.clear()
+
+                window["-PLAY_PAUSE-"].update("⏵")
+                window["-HR-"].update(0)
+                window["-MIN-"].update(0)
+                window["-SEC-"].update(0)
             case "Go":
                 if playing:
                     playing = False
+                    window["-PLAY_PAUSE-"].update("⏵")
+                    paused_timestamp = chat_timestamp_dt
+
                 try:
                     hr = int(values["-HR-"])
                     min = int(values["-MIN-"])
@@ -522,6 +563,7 @@ def main_window() -> None:
                         chat_window.update("Please enter a correct time format.\n", append=True, 
                                     text_color_for_value=settings["NOTIFICATION_COLOR"], 
                                     background_color_for_value=settings["BG_COLOR"])
+                    comment_deque.clear()
                 except ValueError:
                     chat_window.update("Please enter a correct time format.\n", append=True, 
                                     text_color_for_value=settings["NOTIFICATION_COLOR"], 

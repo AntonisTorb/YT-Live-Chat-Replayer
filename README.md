@@ -15,5 +15,5 @@ A GUI app that can replay the live chat from a YouTube live stream, using the JS
 - ~~Membership notifications/messages too maybe?~~ Done!
 - ~~File selector to specify the JSON file path, emote file path (optional) and file containing usernames to highlight (see next).~~ Done!
 - ~~Option to have a different background/text color for comments from specific usernames (for example the streamer or a live translator).~~ Done!
-- When starting the app, after selecting the filepaths and before playback, display all the chats with a negative timestamp.
+- ~~When starting the app, after selecting the filepaths and before playback, display all the chats with a negative timestamp.~~ Done!
 - Properly refactor code for easier modification and performance (less loops would be nice, but the yt JSON is a bit messy).
