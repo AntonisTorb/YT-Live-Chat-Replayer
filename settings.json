@@ -15,12 +15,12 @@
         24
     ],
     "CHAT_LENGTH": 30,
-    "PLAY_PAUSE_KEY": "space",
     "DISABLE_TITLEBAR": true,
     "WINDOW_SIZE": [
         480,
         640
     ],
     "TRANSPARENT": false,
-    "ALPHA": 0.7
+    "ALPHA": 0.7,
+    "OFF_FOCUS_EVENTS": true
 }

@@ -6,3 +6,4 @@ emotes
 *.png
 *.txt
 !settings.json
+*.exe
