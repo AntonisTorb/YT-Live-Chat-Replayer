@@ -4,6 +4,8 @@ __pycache__
 *.json
 emotes
 *.png
+!icon.png
 *.txt
 !settings.json
 *.exe
+release
