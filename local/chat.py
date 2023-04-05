@@ -1,4 +1,5 @@
 from collections import deque
+from datetime import datetime as dt
 import json
 from pathlib import Path
 from typing import Any
@@ -39,15 +40,15 @@ def populate_emote_links(emote_txt:str,
 def determine_message_segment(emote_link_dict:dict[str,str], 
                               emote_names:list[str], 
                               message:list[tuple[str,str]], 
-                              message_list:list[dict[str,Any]], 
-                              item:dict[str,Any]={}) -> None:
+                              message_list:list[dict[str,Any]],
+                              message_type:str="") -> None:
     '''Determining the type of the message segment and appending the content to the message.
     For emotes, the names and links are saved, unless they exist in local file (if selected).
     '''
 
     for message_dict in message_list:
-        for message_type, message_segment in message_dict.items():
-            if message_type == "emoji":
+        for segment_type, message_segment in message_dict.items():
+            if segment_type == "emoji":
                 if len(message_segment["emojiId"]) <= 4:
                     emote_txt = message_segment["emojiId"]
                     populate_emote_links(emote_txt, emote_link_dict, emote_names, message_segment["image"]["thumbnails"][0]["url"])
@@ -61,10 +62,14 @@ def determine_message_segment(emote_link_dict:dict[str,str],
                     except KeyError:  # Just in case
                         # print(len(message_segment["emojiId"]))
                         continue
-                message.append((message_type, emote_txt))
-            elif "liveChatMembershipItemRenderer" in item and message_type == "text":
-                message.append(("membership", message_segment))
+                message.append((segment_type, emote_txt))
+            elif message_type == "membership":
+                if type(message_segment) == bool:
+                    continue
+                message.append((message_type, message_segment))
             elif message_type == "text":
+                message.append((message_type, message_segment))
+            elif message_type == "superchat":
                 message.append((message_type, message_segment))
 
 
@@ -84,6 +89,8 @@ def get_comments(filepath:str|Path,
 
     comments = {}
     member_message_list = []
+    message_type = ""
+    # counter = 0
 
     for line in chat_data:#[0:100]:
         action = line["replayChatItemAction"]["actions"][0]
@@ -91,13 +98,20 @@ def get_comments(filepath:str|Path,
         if "addLiveChatTickerItemAction" in action:
             continue
         item = action["addChatItemAction"]["item"]
-        amount = None
+        if "liveChatViewerEngagementMessageRenderer" in item:
+            continue
+
+        amount = ""
+        message_type = ""
+
         if "liveChatTextMessageRenderer" in item:  # Normal chat.
+            message_type = "text"
             source = item["liveChatTextMessageRenderer"]
             message_list = source["message"]["runs"]
             timestamp = format_timestamp(source["timestampText"]["simpleText"])
             author = source["authorName"]["simpleText"]
         elif "liveChatMembershipItemRenderer" in item:  # Member.
+            message_type = "membership"
             source = item["liveChatMembershipItemRenderer"]
             if "headerPrimaryText" in source:
                 message_list = source["headerPrimaryText"]["runs"]
@@ -108,6 +122,7 @@ def get_comments(filepath:str|Path,
             timestamp = format_timestamp(source["timestampText"]["simpleText"])
             author = source["authorName"]["simpleText"]
         elif "liveChatPaidMessageRenderer" in item:  # Superchat.
+            message_type = "superchat"
             source = item["liveChatPaidMessageRenderer"]
             amount = source["purchaseAmountText"]["simpleText"]
             timestamp = format_timestamp(source["timestampText"]["simpleText"])
@@ -116,7 +131,15 @@ def get_comments(filepath:str|Path,
                 message_list = source["message"]["runs"]
             except KeyError:
                 message_list = []
+        elif "liveChatSponsorshipsGiftPurchaseAnnouncementRenderer" in item:  # Gifted memberships, no text timestamp...
+            message_type = "membership"
+            source = item["liveChatSponsorshipsGiftPurchaseAnnouncementRenderer"]
+            timestamp = int(line["replayChatItemAction"]["videoOffsetTimeMsec"]) // 1000
+            timestamp = format_timestamp(str(dt.fromtimestamp(timestamp) - dt.fromtimestamp(0)))
+            author = source["header"]["liveChatSponsorshipsHeaderRenderer"]["authorName"]["simpleText"]
+            message_list = source["header"]["liveChatSponsorshipsHeaderRenderer"]["primaryText"]["runs"]
         else:
+            # counter += 1
             continue
 
         if amount:
@@ -124,7 +147,7 @@ def get_comments(filepath:str|Path,
         else:
             message = []
 
-        determine_message_segment(emote_link_dict, emote_names, message, message_list, item)
+        determine_message_segment(emote_link_dict, emote_names, message, message_list, message_type)
         if member_message_list:
             determine_message_segment(emote_link_dict, emote_names, message, member_message_list)
             member_message_list = []
@@ -133,7 +156,7 @@ def get_comments(filepath:str|Path,
             comments[timestamp].append((timestamp, author, message))
         else:
             comments[timestamp] = [(timestamp, author, message)]
-
+    # print(counter)
     return comments
 
 

@@ -152,11 +152,7 @@ def display_chat(chat_window:sg.Multiline,
                         text_color_for_value=settings["USERNAME_COLOR"], 
                         background_color_for_value=bg_color)
         for message_type, message_content in comment[2]:
-            if message_type == "text":
-                chat_window.update(f"{message_content} ", append=True, 
-                                    text_color_for_value=settings["TEXT_COLOR"], 
-                                    background_color_for_value=bg_color)
-            elif message_type == "emoji":
+            if message_type == "emoji":
                 emote_img = message_content
                 if emote_img in emote_images.keys():
                     # No parameter for background color in tk.Text.image_create...
@@ -166,7 +162,7 @@ def display_chat(chat_window:sg.Multiline,
                     chat_window.update(f"{message_content} ", append=True, 
                                     text_color_for_value=settings["TEXT_COLOR"], 
                                     background_color_for_value=bg_color)
-            elif message_type == "membership" or message_type == "superchat":
+            else:
                 chat_window.update(f"{message_content} ", append=True, 
                                     text_color_for_value=settings["TEXT_COLOR"], 
                                     background_color_for_value=bg_color)
@@ -189,7 +185,7 @@ def main_window() -> None:
         sys.exit(0)
     
     playing = False
-    paused_timestamp = None # timedelta(hours=0, minutes=12,seconds=25)
+    paused_timestamp = None # timedelta(hours=0, minutes=2,seconds=55)
     
     emote_link_dict = {}
     if data["use local emotes"]:
@@ -280,9 +276,6 @@ def main_window() -> None:
             key_event = False
         else:
             event, values = window.read(timeout=250)
-        
-        # if event != "__TIMEOUT__":
-        #     print(event)
         
         if playing:
             cur_time = dt.now()
