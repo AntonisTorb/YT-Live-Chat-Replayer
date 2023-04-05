@@ -81,7 +81,7 @@ def get_comments(filepath:str|Path,
     The message tuple contains the message type (text, emoji, etc.) and the message content.
     '''
 
-    with open(filepath, encoding="utf8") as file:
+    with open(filepath, "r", encoding="utf8") as file:
         data = file.readlines()
         chat_data = []
         for line in data:
