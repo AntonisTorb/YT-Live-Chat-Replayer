@@ -39,7 +39,7 @@ def main() -> None:
     '''Main function.'''
     
     threading.Thread(target=local.gui.main_window).start()
-    threading.Thread(target=local.gui.listen_kb, daemon=True).start() 
+    threading.Thread(target=local.listener.listen_kb, daemon=True).start() 
 
 
 if __name__ == "__main__":

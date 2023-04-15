@@ -21,11 +21,13 @@ def load_settings() -> dict[str, str|int|tuple[int,int]|bool]:
         "HIGHLIGHT_USER_BG_COLOR": "grey",
         "EMOTE_SIZE" : (24, 24),
         "CHAT_LENGTH" : 30,  # Reducing this increases performance.
-        "DISABLE_TITLEBAR" : True,  # If True, then no window resizing after running the app.
+        "DISABLE_TITLEBAR" : False,  # If True, then no window resizing after running the app.
         "WINDOW_SIZE" : (480, 640),  # If 'DISABLE_TITLEBAR' is True, set the window size (width, height).
         "TRANSPARENT" : False,
         "ALPHA" : 0.7,  # Change to 1 or None if TRANSPARENT is True.
-        "OFF_FOCUS_EVENTS": True
+        "OFF_FOCUS_EVENTS": True,
+        "CONDENSED": True,  # Limits the empty lines in the chat window. 
+        "SHOW_TIMESTAMP": False  # Whether to show timestamp next to username.
     }
 
     current_directory = Path(__file__).parent if "__file__" in locals() else Path.cwd()

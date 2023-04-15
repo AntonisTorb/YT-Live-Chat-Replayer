@@ -28,11 +28,11 @@ Instructions for Windows:
 
 ## How to use
 
-The first window you will see is where you can select the chat JSON file, and optionally the directory containing the emotes, as well as the file containing the usernames to highlight. If you want to use any of those two optional features, please make sure to also check the box next to each one.
+The first window you will see is where you can select the chat JSON file, and optionally the directory containing the emotes, the file containing the usernames to highlight (`.txt`, one username per line), as well as the file containing the usernames to ignore(`.txt`, one username per line). If you want to use any of those three optional features, please make sure to also check the box next to each one.
 
 <div align="center"><img src="images/data.jpg" alt="Something_went_wrong.jpg" style="margin: 2em 0;"></div>
 
-After selecting all the data you need and want, press the `Start` button. Depending on the size of the JSON file and the amount of emotes, it might take some time for the app to become responsive, so please wait for a bit. This is the window that appears after pressing `Start`:
+After selecting all the data you need and want, press the `Start` button. Depending on the size of the JSON file and the amount of emotes, it might take some time for the app to become responsive depending on the size of the chat file and the amount of emotes that need to be downloaded, so please wait for a bit. This is the window that appears after pressing `Start`:
 
 <div align="center"><img src="images/chat.jpg" alt="Something_went_wrong.jpg" style="margin: 2em 0;"></div>
 
@@ -42,7 +42,10 @@ Next to the play button is the `Stop` button, used to reset the playback to zero
 
 The three input fields to the right of the `Stop` button represent the `hours`, `minutes` and `seconds` of the current playback timestamp. If you want you can edit them and press the `Go` button to jump to a specific timestamp (Note: if the timestamp selected this way is longer than the last chat timestamp, then playback will continue with no new messages appearing, so please keep in mind to stay within the limits).
 
-Next to the `Go` button is a checkbox with the option for the chat window to receive [off-focus events](#off-focus-startpauseresume).
+
+At the far right you will find the `Exit` button to quit the app, and to it's left the `Settings` button. Pressing the `Settings` button opens a small area between the chat window and the controls at the bottom, where you can update some settings on the go.
+
+ In the settings area you will find the checkbox `Off-focus events`, allowing the chat window to receive [off-focus events](#off-focus-startpauseresume), as well as an `Opacity` spin element, allowing you to modify the opacity of the window while it's running. Please refer to the [Settings](#settings) section for all available settings.
 
 ## Notable features
 
@@ -68,14 +71,16 @@ You can find several settings in the `settings.json` file. Here are the settings
 - `"BG_COLOR": "#202020"`: The default background color used.
 - `"MEMBER_BG_COLOR": "blue"`: The background color used for the display of membership notifications and membership messages.
 - `"SUPERCHAT_BG_COLOR": "green"`: The background color used for the display of superchat messages.
-- `"HIGHLIGHT_USER_BG_COLOR": "grey"`: The background color used for the display of highlighted user messages.
+- `"HIGHLIGHT_USER_BG_COLOR": "purple"`: The background color used for the display of highlighted user messages.
 - `"EMOTE_SIZE": [24,24]`: The size of the emotes displayed.
 - `"CHAT_LENGTH": 30`: The maximum amount of messages retained in the chat window. Reducing this increases performance.
-- `"DISABLE_TITLEBAR": true`: Whether or not to disable the titlebar of the chat window, to avoid having the solid white titlebar. If set to true (default), then the chat window cannot be resized, in which case you can use:
+- `"DISABLE_TITLEBAR": false`: Whether or not to disable the titlebar of the chat window, to avoid having the solid white titlebar. If set to true (default), then the chat window cannot be resized, in which case you can use:
 - `"WINDOW_SIZE" : (480, 640)`: Used to set the size of the window in the format `(width, height)` if the titlebar is disabled.
 - `"TRANSPARENT" : false`: Whether to make the chat window fully transparent. This option makes it difficult to move the chat around, a different option is:
 - `"ALPHA": 0.7`: The opacity of the chat window, with a value between 0 (fully transparent) and 1 (fully opaque). The disadvantage with this option is that the text also becomes transparent along with the window, so the value should not be too low. If you select `"TRANSPARENT" : true`, please set this value to 1.
 - `"OFF_FOCUS_EVENTS": true`: Whether the app should receive the `space` keyboard event in order to play/pause/resume the chat playback when the chat window is not in focus.
+- `"CONDENSED": true`: When set to true, minimizes the empty space allowed in the chat window (removes empty lines after username and bewteen each chat message).
+- `"SHOW_TIMESTAMP": false`: Whether or not to show the timestamp of the chat message next to the username.
 
 
 ## Thank you and enjoy!

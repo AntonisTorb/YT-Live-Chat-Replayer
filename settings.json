@@ -9,18 +9,20 @@
     "BG_COLOR": "#202020",
     "MEMBER_BG_COLOR": "blue",
     "SUPERCHAT_BG_COLOR": "green",
-    "HIGHLIGHT_USER_BG_COLOR": "grey",
+    "HIGHLIGHT_USER_BG_COLOR": "purple",
     "EMOTE_SIZE": [
         24,
         24
     ],
     "CHAT_LENGTH": 30,
-    "DISABLE_TITLEBAR": true,
+    "DISABLE_TITLEBAR": false,
     "WINDOW_SIZE": [
         480,
         640
     ],
     "TRANSPARENT": false,
     "ALPHA": 0.7,
-    "OFF_FOCUS_EVENTS": true
+    "OFF_FOCUS_EVENTS": true,
+    "CONDENSED": true,
+    "SHOW_TIMESTAMP": false
 }

@@ -75,7 +75,8 @@ def determine_message_segment(emote_link_dict:dict[str,str],
 
 def get_comments(filepath:str|Path, 
                  emote_link_dict:dict[str,str], 
-                 emote_names:list[str] = []) -> dict[str, list[tuple[str,str,tuple[str,str]]]]:
+                 emote_names:list[str] = [],
+                 usernames_to_ignore:list[str] = []) -> dict[str, list[tuple[str,str,tuple[str,str]]]]:
     '''Get a dictionary of all comments with the timestamp as key, and a list of tuples as value.
     The values contain the timestamp, author of the message and the message as a tuple.
     The message tuple contains the message type (text, emoji, etc.) and the message content.
@@ -105,14 +106,21 @@ def get_comments(filepath:str|Path,
         message_type = ""
 
         if "liveChatTextMessageRenderer" in item:  # Normal chat.
-            message_type = "text"
             source = item["liveChatTextMessageRenderer"]
+            author = source["authorName"]["simpleText"]
+            if author in usernames_to_ignore:
+                continue
+            message_type = "text"
+
             message_list = source["message"]["runs"]
             timestamp = format_timestamp(source["timestampText"]["simpleText"])
-            author = source["authorName"]["simpleText"]
         elif "liveChatMembershipItemRenderer" in item:  # Member.
-            message_type = "membership"
             source = item["liveChatMembershipItemRenderer"]
+            author = source["authorName"]["simpleText"]
+            if author in usernames_to_ignore:
+                continue
+            message_type = "membership"
+
             if "headerPrimaryText" in source:
                 message_list = source["headerPrimaryText"]["runs"]
                 if "message" in source:
@@ -120,23 +128,29 @@ def get_comments(filepath:str|Path,
             else:
                 message_list = source["headerSubtext"]["runs"]
             timestamp = format_timestamp(source["timestampText"]["simpleText"])
-            author = source["authorName"]["simpleText"]
+
         elif "liveChatPaidMessageRenderer" in item:  # Superchat.
-            message_type = "superchat"
             source = item["liveChatPaidMessageRenderer"]
+            author = source["authorName"]["simpleText"]
+            if author in usernames_to_ignore:
+                continue
+            message_type = "superchat"
             amount = source["purchaseAmountText"]["simpleText"]
             timestamp = format_timestamp(source["timestampText"]["simpleText"])
-            author = source["authorName"]["simpleText"]
             try:
                 message_list = source["message"]["runs"]
             except KeyError:
                 message_list = []
         elif "liveChatSponsorshipsGiftPurchaseAnnouncementRenderer" in item:  # Gifted memberships, no text timestamp...
-            message_type = "membership"
             source = item["liveChatSponsorshipsGiftPurchaseAnnouncementRenderer"]
+            author = source["header"]["liveChatSponsorshipsHeaderRenderer"]["authorName"]["simpleText"]
+            if author in usernames_to_ignore:
+                continue
+            message_type = "membership"
             timestamp = int(line["replayChatItemAction"]["videoOffsetTimeMsec"]) // 1000
             timestamp = format_timestamp(str(dt.fromtimestamp(timestamp) - dt.fromtimestamp(0)))
-            author = source["header"]["liveChatSponsorshipsHeaderRenderer"]["authorName"]["simpleText"]
+           
+
             message_list = source["header"]["liveChatSponsorshipsHeaderRenderer"]["primaryText"]["runs"]
         else:
             # counter += 1
