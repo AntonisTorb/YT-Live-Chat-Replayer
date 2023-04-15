@@ -152,11 +152,11 @@ def display_chat(chat_window:sg.Multiline,
         if settings["CONDENSED"]:
             chat_window.update(" "*5, append=True, 
                             text_color_for_value=settings["TEXT_COLOR"], 
-                            background_color_for_value=settings["BG_COLOR"])
+                            background_color_for_value=bg_color)
         else:
             chat_window.update("\n", append=True, 
                             text_color_for_value=settings["TEXT_COLOR"], 
-                            background_color_for_value=settings["BG_COLOR"])
+                            background_color_for_value=bg_color)
         for message_type, message_content in comment[2]:
             if message_type == "emoji":
                 emote_img = message_content
