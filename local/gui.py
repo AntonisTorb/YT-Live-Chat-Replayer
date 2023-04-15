@@ -209,7 +209,7 @@ def main_window() -> None:
         comments = chat.get_comments(data["json path"], emote_link_dict, usernames_to_ignore=usernames_to_ignore)
 
     if data["highlight users"]:
-        with open(data["user path"], "r") as file:
+        with open(data["user path"], "r", encoding="utf8") as file:
             usernames_to_highlight = [user[:-1] if user.endswith("\n") else user for user in file.readlines()]
     else:
         usernames_to_highlight = []
