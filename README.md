@@ -1,6 +1,9 @@
 # YT Live Chat Replayer
 A GUI app that can replay the live chat from a YouTube live stream, using the JSON file containing the chat data (obtained with [yt-dlp](https://github.com/yt-dlp/yt-dlp) for example).
 
+## WARNING!
+This application uses PySimpleGUI for the GUI frontend. PySimpleGUI has recently become closed source in a disappointing decision, thus I would advise you to use the PySimpleGUI version specified in the `requirements.txt` file. For any future versions, I can guarantee neither the integrity nor the security of the package.
+
 The app supports playback of the chat messages, including emotes. Membership notifications, membership messages, as well as superchat messages are highlighted. Additionally, there is the option to highlight messages from specific users, by providing a text file with each username in a separate line.
 
 <div align="center" style="color:orange;border: 2px solid red;border-radius:20px;padding:2em;min-width:250px;margin: 2em 0;">
